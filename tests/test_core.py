@@ -46,6 +46,10 @@ class Curve(unittest.TestCase):
         self.assertEqual(c["progress"], 0)
         self.assertEqual(c["creator"], VECTORS[0][0])
 
+    def test_nonstandard_curve(self):
+        self.assertTrue(decode_curve(curve_bytes(1_073_000_000 * 10**6, 35 * 10**9, 700_000_000 * 10**6, 5 * 10**9, 10**15))["standard"])
+        self.assertFalse(decode_curve(curve_bytes(1_073_000_000 * 10**6, 279_782 * 10**9, 793_100_000 * 10**6, 4, 10**15))["standard"])
+
     def test_impact(self):
         self.assertAlmostEqual(sell_impact(100, 100), 0.75)
         self.assertEqual(sell_impact(0, 100), 0)

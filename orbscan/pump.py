@@ -10,6 +10,7 @@ SYSTEM = "11111111111111111111111111111111"
 WSOL = "So11111111111111111111111111111111111111112"
 TOKEN_DECIMALS = 6
 CURVE_TOKENS_FOR_SALE = 793_100_000        # real tokens on a fresh curve
+STANDARD_VIRTUAL_SOL = 30.0
 BURN = {"1nc1nerator11111111111111111111111111111111"}
 
 
@@ -31,6 +32,8 @@ def decode_curve(raw) -> dict | None:
         "complete": bool(raw[48]),
         "creator": b58encode(raw[49:81]) if len(raw) >= 81 else None,
     }
+    # a standard pump.fun curve starts with 30 virtual SOL; anything else (custom/abnormal curves) has a meaningless price
+    c["standard"] = abs((vsol - rsol) / 1e9 - STANDARD_VIRTUAL_SOL) < 1.0
     c["price"] = price_sol(vsol, vtok)
     c["mcap_sol"] = c["price"] * supply / 10 ** TOKEN_DECIMALS if c["price"] else 0.0
     c["real_sol"] = rsol / 1e9

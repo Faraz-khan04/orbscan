@@ -59,6 +59,9 @@ class Collector:
                 continue
             for r, acc in zip(rows, accs):
                 cs = decode_curve(acc["data"]) if acc else None
+                if cs and not cs["standard"] and not cs["complete"]:
+                    self.c.execute("UPDATE launches SET status='nonstandard' WHERE mint=?", (r["mint"],))
+                    continue
                 if cs and (cs["real_sol"] >= config.TRIGGER_SOL or cs["complete"]):
                     status = "queued"
                     try:
