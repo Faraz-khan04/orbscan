@@ -1,0 +1,53 @@
+# Runs the collector in batches on GitHub's machines, so no laptop has to stay on.
+# Each run: restore the database from the `data` branch, collect for ~11 minutes, write the report,
+# and save everything back to `data` (one commit, force-pushed, so the history never grows).
+name: collect
+on:
+  schedule:
+    - cron: "*/15 * * * *"     # GitHub may start scheduled runs late; gaps only mean fewer launches sampled
+  workflow_dispatch:
+concurrency:
+  group: orbscan
+  cancel-in-progress: false
+permissions:
+  contents: write
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install websockets==16.0
+      - name: Restore data
+        run: |
+          if git fetch -q origin data 2>/dev/null; then
+            git show origin/data:orbscan.db > orbscan.db
+          fi
+          ls -l orbscan.db 2>/dev/null || echo "starting a new database"
+      - name: Collect
+        env:
+          ORB_RPC_URL: ${{ secrets.ORB_RPC_URL }}
+          ORB_KEEP_AWAKE: "0"
+        run: python -m orbscan collect --for 660
+      - name: Report
+        if: always()
+        run: |
+          python -m orbscan status
+          python -m orbscan report > /dev/null
+          tail -n 40 orbscan.log || true
+      - name: Save data
+        if: always()
+        run: |
+          [ -f orbscan.db ] || exit 0
+          mkdir -p /tmp/data && cp orbscan.db report.md outcomes.csv /tmp/data/ 2>/dev/null || true
+          cat > /tmp/data/README.md <<'MD'
+          Data written by the `collect` workflow. **report.md** is the current paper-test result.
+          MD
+          cd /tmp/data
+          git init -q -b data
+          git add -A
+          git -c user.name="orbscan-bot" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "data $(date -u +%FT%TZ)"
+          git push -qf "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" data
